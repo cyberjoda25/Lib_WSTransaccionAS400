@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scm:sourceControlLoadRule xmlns:scm="http://com.ibm.team.scm" eclipseProjectOptions="create" version="1">
+	<itemLoadRule alternateName="WSTransaccionAs400">
+        <component name="WSTransaccionAs400"/>
+        <item repositoryPath="/"/>
+    </itemLoadRule>
+	<itemLoadRule alternateName="WSTransaccionAS400Java">
+        <component name="WSTransaccionAS400Java"/>
+        <item repositoryPath="/"/>
+    </itemLoadRule>
+	<itemLoadRule alternateName="ISeriesNew">
+        <component name="ISeriesNew"/>
+        <item repositoryPath="/"/>
+    </itemLoadRule>
+ </scm:sourceControlLoadRule>

@@ -1,0 +1,302 @@
+BROKER SCHEMA com.diners.wstransaccionas400
+
+DECLARE nomArchLogs EXTERNAL CHARACTER ExecutionGroupLabel;
+CREATE COMPUTE MODULE WSTransaccionAS400_ProcesarEntrada
+	/* * Funcion que mapea la estructura de entrada. * Parameters: * IN: REFERENCE InputRoot - arbol que contiene los datos de entrada. 
+    * RETURNS: BOOLEAN . * */
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		SET OutputRoot = InputRoot;
+		SET OutputLocalEnvironment = InputLocalEnvironment;
+		
+		SET Environment.SoapServiceData.ReplyIdentifier = OutputLocalEnvironment.Destination.HTTP.RequestIdentifier;
+		SET Environment.log.id = '(' || SUBSTRING(CAST(Environment.SoapServiceData.ReplyIdentifier AS CHARACTER) FROM 3 FOR 48 ) || ') ';
+		
+		DECLARE host CHARACTER OutputRoot.HTTPInputHeader."X-Original-HTTP-Command";
+		DECLARE id CHARACTER Environment.log.id; 
+		CALL ImprimirLogInfo(id || '----Inicio procesamiento AS400 (JSON - MQ) - ' || host);
+		
+		SET Environment.Variable.ruteoFlujo = 'HTTPJson';
+		SET Environment.Variable.nomArchivoLogs = nomArchLogs;
+		
+		DECLARE messageIn REFERENCE TO OutputRoot.JSON.Data.MessageIn;
+		DECLARE Header REFERENCE TO messageIn.header;
+		
+		SET OutputRoot.XMLNSC.MessageIn = messageIn;
+		
+		-- Creando la estructura de la conexion
+		CREATE LASTCHILD OF Environment.listaAs400  NAME 'conexion';
+		DECLARE Conexion REFERENCE TO Environment.listaAs400.conexion;
+		CREATE LASTCHILD OF Conexion  NAME 'hostname';
+		CREATE LASTCHILD OF Conexion  NAME 'moduloRPG';
+		CREATE LASTCHILD OF Conexion  NAME 'programa';
+		CREATE LASTCHILD OF Conexion  NAME 'tipoTransformacion';
+		CREATE LASTCHILD OF Conexion  NAME 'nomProcedimiento';
+		CREATE LASTCHILD OF Conexion  NAME 'libraryList';
+		CREATE LASTCHILD OF Conexion  NAME 'rutaPath';
+		CREATE LASTCHILD OF Conexion  NAME 'comandoRPG';
+		CREATE LASTCHILD OF Conexion  NAME 'limpiarCache';
+		CREATE LASTCHILD OF Conexion  NAME 'rutaLogs';
+		-- Pasando los valores a la estructura de la conexion
+		SET Conexion.hostname = Header.hostname;
+		SET Conexion.moduloRPG = Header.moduloRPG;
+		SET Conexion.programa = Header.programa;
+		SET Conexion.nomProcedimiento = COALESCE(Header.nomProcedimiento, '');
+		SET Conexion.libraryList = Header.libraryList;
+		SET Conexion.rutaPath = Header.rutaPath;
+		SET Conexion.comandoRPG = COALESCE(Header.comandoRPG, '');
+		SET Conexion.limpiarCache = COALESCE(Header.limpiarCache, '0');
+		SET Conexion.rutaLogs = COALESCE(Header.rutaLogs, '');
+
+		--validacion para mensajes del tipo HTTP	
+		IF InputRoot.HTTPInputHeader.Host IS NOT NULL THEN
+			SET OutputLocalEnvironment.HTTPInputHeader = InputRoot.HTTPInputHeader;
+			SET OutputRoot.HTTPInputHeader = NULL;
+		END IF;	
+						
+        --definimos el nombre de la hoja de estilos XSL que se usará para la transformación dinámica del mensaje		
+		DECLARE nomRPG CHAR Environment.listaAs400.conexion.moduloRPG;
+
+		SET OutputLocalEnvironment.XSL.StyleSheetName = 'transformador' || nomRPG || '.xsl';
+		
+		CALL ImprimirLogInfo(id || 'Transformando el mensaje...');
+		RETURN TRUE;
+	END;
+	
+END MODULE;
+
+CREATE COMPUTE MODULE WSTransaccionAS400_ProcesarBlob
+	/* * Funcion que mapea la estructura de entrada. * Parameters: * IN: REFERENCE InputRoot - arbol que contiene los datos de entrada. 
+    * RETURNS: BOOLEAN . * */
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		SET OutputRoot.Properties = InputRoot.Properties;
+		SET OutputRoot.HTTPInputHeader = InputRoot.HTTPInputHeader; 
+		SET OutputLocalEnvironment = InputLocalEnvironment;
+		
+		SET Environment.SoapServiceData.ReplyIdentifier = OutputLocalEnvironment.Destination.HTTP.RequestIdentifier;
+		SET Environment.log.id = '(' || SUBSTRING(CAST(Environment.SoapServiceData.ReplyIdentifier AS CHARACTER) FROM 3 FOR 48 ) || ') ';
+		
+		SET Environment.Variable.ruteoFlujo = 'HTTP';
+		
+		DECLARE host CHARACTER OutputRoot.HTTPInputHeader."X-Original-HTTP-Command";
+		DECLARE id CHARACTER Environment.log.id;
+		CALL ImprimirLogInfo(id || '----Inicio procesamiento AS400 (HTTP) ' || host);
+
+		SET OutputRoot.XMLNSC = InputRoot.XMLNSC.InputAs400.Entrada;
+		
+		CREATE FIRSTCHILD OF OutputRoot.XMLNSC TYPE XMLNSC.XmlDeclaration NAME 'XmlDeclaration';	
+		SET OutputRoot.XMLNSC.(XMLNSC.XmlDeclaration).(XMLNSC.Attribute)Version = '1.0';
+		SET OutputRoot.XMLNSC.(XMLNSC.XmlDeclaration).(XMLNSC.Attribute)Encoding = 'UTF-8';
+		
+		DECLARE Header REFERENCE TO InputRoot.XMLNSC.InputAs400.Conexion;
+		CREATE LASTCHILD OF Environment.listaAs400  NAME 'conexion';
+		-- Creando la estructura de la conexion
+		DECLARE Conexion REFERENCE TO Environment.listaAs400.conexion;
+		CREATE LASTCHILD OF Conexion  NAME 'hostname';
+		CREATE LASTCHILD OF Conexion  NAME 'moduloRPG';
+		CREATE LASTCHILD OF Conexion  NAME 'programa';
+		CREATE LASTCHILD OF Conexion  NAME 'tipoTransformacion';
+		CREATE LASTCHILD OF Conexion  NAME 'nomProcedimiento';
+		CREATE LASTCHILD OF Conexion  NAME 'libraryList';
+		CREATE LASTCHILD OF Conexion  NAME 'rutaPath';
+		CREATE LASTCHILD OF Conexion  NAME 'comandoRPG';
+		CREATE LASTCHILD OF Conexion  NAME 'limpiarCache';
+		CREATE LASTCHILD OF Conexion  NAME 'rutaLogs';
+		-- Pasando los valores a la estructura de la conexion
+		SET Conexion.hostname = Header.hostname;
+		SET Conexion.moduloRPG = Header.moduloRPG;
+		SET Conexion.programa = Header.programa;
+		SET Conexion.nomProcedimiento = COALESCE(Header.nomProcedimiento, '');
+		SET Conexion.libraryList = Header.libraryList;
+		SET Conexion.rutaPath = Header.rutaPath;
+		SET Conexion.comandoRPG = COALESCE(Header.comandoRPG, '');
+		SET Conexion.limpiarCache = COALESCE(Header.limpiarCache, '0');
+		SET Conexion.rutaLogs = COALESCE(Header.rutaLogs, '');
+		
+		--validacion para mensajes del tipo HTTP	
+		IF InputRoot.HTTPInputHeader.Host IS NOT NULL THEN
+			SET OutputLocalEnvironment.HTTPInputHeader = InputRoot.HTTPInputHeader;
+			SET OutputRoot.HTTPInputHeader = NULL;
+		END IF;	
+		
+		CALL ImprimirLogInfo(id || 'Mensaje AS400 XMLNSC obtenido...');
+		
+		RETURN TRUE;
+	END;
+	
+END MODULE;
+
+
+CREATE COMPUTE MODULE ProcesarMensajesAs400_EntradaAs400
+	/* * Funcion que mapea la estructura de entrada. * Parameters: * IN: REFERENCE InputRoot - arbol que contiene los datos de entrada. 
+    * RETURNS: BOOLEAN . * */
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		SET OutputRoot = InputRoot;
+		
+		SET InputLocalEnvironment.ISeriesPcmlCall.configurableService = Environment.FlujosAs400.ServiceConfigurable;
+		SET InputLocalEnvironment.ISeriesPcmlCall.isXPcml 			  = Environment.FlujosAs400.ISXPCML;
+		SET InputLocalEnvironment.ISeriesPcmlCall.pcmlCall 			  = Environment.FlujosAs400.Programa;
+		SET InputLocalEnvironment.ISeriesPcmlCall.libraryList 		  = Environment.FlujosAs400.Library;
+		
+		DELETE FIELD InputRoot.XMLNSC.InputAs400;
+		
+		RETURN TRUE;
+	END;
+	
+END MODULE;
+
+CREATE COMPUTE MODULE WSTransaccionAS400_ProcesarSalida
+	/* * Funcion que mapea la estructura de entrada. * Parameters: * IN: REFERENCE InputRoot - arbol que contiene los datos de entrada. 
+    * RETURNS: BOOLEAN . * */
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		-- Arreglando el encoding
+		SET OutputRoot.Properties.Encoding = '546';
+		SET OutputRoot.Properties.CodedCharSetId = '1208';
+		
+		DECLARE id CHARACTER Environment.log.id;
+		CALL ImprimirLogInfo(id || 'Recibiendo el mensaje procesado en la llamada As400...');
+		
+		IF Environment.Variable.ruteoFlujo = 'HTTP' THEN
+			-- Procesar Salida XML
+			DECLARE nomPrograma CHARACTER Environment.listaAs400.conexion.programa;
+			
+			CREATE LASTCHILD OF OutputRoot.XMLNSC DOMAIN 'XMLNSC' TYPE XMLNSC.Folder NAME 'MessageOut';
+			
+			IF FIELDTYPE(InputRoot.XMLNSC) IS NOT NULL THEN
+				CREATE LASTCHILD OF OutputRoot.XMLNSC.MessageOut DOMAIN 'XMLNSC' FROM InputRoot.XMLNSC.xpcml;
+			ELSE
+				CREATE LASTCHILD OF OutputRoot.XMLNSC.MessageOut DOMAIN 'XMLNSC' NAME nomPrograma;
+			END IF;
+			
+			SET OutputRoot.XMLNSC.MessageOut.codError = Environment.salida.codError;
+			SET OutputRoot.XMLNSC.MessageOut.descError = Environment.salida.descError;
+			
+			CALL ImprimirLogInfo(id || 'Finalizando el servicio y enviado mensaje HTTP...');
+		ELSE
+			-- Procesar Salida Json
+			CREATE LASTCHILD OF OutputRoot.JSON.Data DOMAIN 'JSON' TYPE XMLNSC.Folder NAME 'MessageOut';
+			
+			CREATE LASTCHILD OF OutputRoot.JSON.Data.MessageOut DOMAIN 'JSON' FROM InputRoot.XMLNSC.xpcml;
+			SET OutputRoot.JSON.Data.MessageOut = InputRoot.XMLNSC.xpcml;
+			
+			SET OutputRoot.JSON.Data.MessageOut.codError = Environment.salida.codError;
+			SET OutputRoot.JSON.Data.MessageOut.descError = Environment.salida.descError;
+			
+			CALL ImprimirLogInfo(id || 'Finalizando el servicio y enviado mensaje JSON...');
+		END IF; 
+		
+		RETURN TRUE;
+	END;
+	
+END MODULE;
+
+
+CREATE COMPUTE MODULE WSTransaccionAS400_ProcesarError
+	/* * Funcion que mapea la estructura de entrada. * Parameters: * IN: REFERENCE InputRoot - arbol que contiene los datos de entrada. 
+    * RETURNS: BOOLEAN . * */
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		SET OutputRoot.Properties = InputRoot.Properties;
+		SET OutputLocalEnvironment = InputLocalEnvironment;
+		
+		DECLARE codError INTEGER -1;
+		DECLARE descError CHARACTER '';
+			
+		-- Revisar si existe mensajes en la lista de excepciones.
+		IF CARDINALITY(InputExceptionList.*[]) > 0 THEN
+			SET codError = 0;
+			SET descError = '';
+			DECLARE ListaExcepciones REFERENCE TO InputExceptionList;
+	
+			CALL obtenerException(ListaExcepciones, codError, descError);
+			
+			SET codError = '997';
+			SET descError = 'AS400: ESB-' || CAST(codError AS CHARACTER) || ' - ' || descError;
+			
+		ELSE 
+			-- Procesar Error
+			SET codError = Environment.salida.codError;
+			SET descError = Environment.salida.descError;
+			
+			/*SET codError = '999';
+			SET descError = 'AS400: Error al invocar el servicio del AS400.';*/
+		END IF;
+		
+		IF Environment.Variable.ruteoFlujo = 'HTTP' THEN
+			
+			CREATE LASTCHILD OF OutputRoot.XMLNSC DOMAIN 'XMLNSC' TYPE XMLNSC.Folder NAME 'MessageOut';
+			
+			SET OutputRoot.XMLNSC.MessageOut.codError = codError;
+			SET OutputRoot.XMLNSC.MessageOut.descError = descError;
+			
+		ELSE
+			CREATE LASTCHILD OF OutputRoot.JSON.Data DOMAIN 'JSON' TYPE XMLNSC.Folder NAME 'MessageOut';
+			
+			SET OutputRoot.JSON.Data.MessageOut.codError = codError;
+			SET OutputRoot.JSON.Data.MessageOut.descError = descError;
+			
+		END IF; 
+		
+		DECLARE id CHARACTER Environment.log.id;
+		CALL ImprimirLogInfo(id || ' DescError: ' || descError);
+		
+		RETURN TRUE;
+	END;
+	
+END MODULE;
+/* * Procedimiento que permite llamar a la clase Java para logs. 
+    * RETURNS: BOOLEAN . * */
+CREATE PROCEDURE ImprimirLogInfo (IN txt CHARACTER)
+	BEGIN
+		
+		CALL imprimirLogsGenerico(txt, nomArchLogs, 'INFO');
+	END;
+/* * Procedimiento obtiene la excepcion. 
+    * RETURNS: BOOLEAN . * */
+CREATE PROCEDURE obtenerException(IN InputTree REFERENCE, OUT messageNumber INTEGER,
+	OUT messageText CHAR)
+	/****************************************************************************
+	* A procedure that will get the details of the last exception from a message
+	* IN InputTree: The incoming exception list
+	* IN messageNumber: The last message numberr.
+	* IN messageText: The last message text.
+	*****************************************************************************/
+	BEGIN
+	-- Create a reference to the first child of the exception list
+	SET messageText = 'Lista de Errores';
+	DECLARE ptrException REFERENCE TO InputTree.*[1];
+	-- keep looping while the moves to the child of exception list work
+	WHILE lastmove(ptrException) DO
+		-- store the current values for the error number and text
+		IF ptrException.Number IS NOT NULL THEN
+			SET messageNumber = ptrException.Number;
+			SET messageText = messageText || ' | ' || ptrException.Text || ' -- (';
+			
+			-- Colocar el rastreo
+			FOR eInsert AS ptrException.Insert[] DO
+				SET messageText = messageText || '[' || CAST(eInsert.Type AS CHARACTER) || ']' || eInsert.Text || ',';
+			END FOR;
+			
+			SET messageText = LEFT(messageText, LENGTH(messageText)-1) || ')';
+			
+		END IF;
+		-- now move to the last child which should be the next exceptionlist
+		MOVE ptrException LASTCHILD;
+	END WHILE;
+END;
+	
+/*
+* Invoca un método Java enviando como parametro una cadena de texto y el nombre del servicio y el nivel Trace
+* Es método se utiliza por invocaciones JAVA en caso de querer imprimir una cadena en cada linea
+*
+* Parameters:
+*
+* IN texto: Cadena CHARACTER que se envía al método.
+* IN nameService: Nombre del servicio.
+*/
+CREATE FUNCTION imprimirLogsGenerico (IN texto CHARACTER, IN nomService CHARACTER, IN nivelTrace CHARACTER)
+LANGUAGE JAVA
+EXTERNAL NAME "com.diners.wstransaccionas400.WSTransaccionAS400.imprimirLog";
